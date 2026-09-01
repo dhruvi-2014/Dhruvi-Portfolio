@@ -3,6 +3,7 @@ const mongoose = require("mongoose");
 
 let mongoConnection = null;
 
+// Contact schema
 const contactSchema = new mongoose.Schema(
   {
     name: {
@@ -23,17 +24,21 @@ const contactSchema = new mongoose.Schema(
   }
 );
 
+// Contact model
 const Contact =
   mongoose.models.Contact ||
   mongoose.model("Contact", contactSchema);
 
+// MongoDB connection
 async function connectToMongoDB() {
   if (mongoConnection) {
     return mongoConnection;
   }
 
   if (!process.env.MONGODB_URI) {
-    throw new Error("MONGODB_URI environment variable is not configured.");
+    throw new Error(
+      "MONGODB_URI environment variable is not configured."
+    );
   }
 
   mongoConnection = mongoose.connect(process.env.MONGODB_URI);
@@ -41,31 +46,53 @@ async function connectToMongoDB() {
   return mongoConnection;
 }
 
+// Health check
 app.http("health", {
   methods: ["GET"],
   authLevel: "anonymous",
   route: "health",
+
   handler: async () => {
-    return {
-      status: 200,
-      jsonBody: {
-        status: "success",
-        message: "Portfolio API is working!"
-      }
-    };
+    try {
+      await connectToMongoDB();
+
+      return {
+        status: 200,
+        jsonBody: {
+          status: "success",
+          message: "Portfolio API and MongoDB are working!"
+        }
+      };
+    } catch (error) {
+      console.error(
+        "MongoDB health check failed:",
+        error
+      );
+
+      return {
+        status: 500,
+        jsonBody: {
+          status: "error",
+          message: "MongoDB connection failed."
+        }
+      };
+    }
   }
 });
 
+// Contact form
 app.http("contact", {
   methods: ["POST"],
   authLevel: "anonymous",
   route: "contact",
+
   handler: async (request) => {
     try {
       const body = await request.json();
 
       const { name, email, message } = body;
 
+      // Validate input
       if (!name || !email || !message) {
         return {
           status: 400,
@@ -76,14 +103,17 @@ app.http("contact", {
         };
       }
 
+      // Connect to MongoDB
       await connectToMongoDB();
 
+      // Create contact document
       const newContact = new Contact({
         name,
         email,
         message
       });
 
+      // Save to MongoDB
       await newContact.save();
 
       return {
@@ -94,7 +124,10 @@ app.http("contact", {
         }
       };
     } catch (error) {
-      console.error("Contact submission error:", error);
+      console.error(
+        "Contact submission error:",
+        error
+      );
 
       return {
         status: 500,
