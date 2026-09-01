@@ -54,6 +54,16 @@ app.http("health", {
 
   handler: async () => {
     try {
+      if (!process.env.MONGODB_URI) {
+        return {
+          status: 500,
+          jsonBody: {
+            status: "error",
+            message: "MONGODB_URI is NOT configured in Azure."
+          }
+        };
+      }
+
       await connectToMongoDB();
 
       return {
@@ -64,16 +74,14 @@ app.http("health", {
         }
       };
     } catch (error) {
-      console.error(
-        "MongoDB health check failed:",
-        error
-      );
+      console.error("MongoDB health check failed:", error);
 
       return {
         status: 500,
         jsonBody: {
           status: "error",
-          message: "MongoDB connection failed."
+          errorName: error.name,
+          message: error.message
         }
       };
     }
